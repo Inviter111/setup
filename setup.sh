@@ -72,10 +72,10 @@ install_postgresql() {
         sudo apt install -y postgresql
 
         echo "Postgresql installed, lets set up user with database"
-        read -pr "Enter username (default is $USER): " pg_user
-        read -spr "Enter password (if empty, same as username): " pg_password
+        read -r -p "Enter username (default is $USER): " pg_user
+        read -r -p "Enter password (if empty, same as username): " -s pg_password
         echo ""
-        read -pr "Enter database name (if empty, same as username): " pg_db
+        read -r -p "Enter database name (if empty, same as username): " pg_db
         pg_user=${pg_user:-$USER}
         pg_password=${pg_password:-$USER}
         pg_db=${pg_db:-$USER}
@@ -97,7 +97,7 @@ function install_dotfiles {
     if [[ ! -d $dotfiles_dir ]]; then
         echo -e "Installing dotfiles..."
         echo "Dotfiles dir was not found, should download"
-        read -pr "Provide a link to github repo or use default ($default_dotfiles_link): " dotfiles_link
+        read -r -p "Provide a link to github repo or use default ($default_dotfiles_link): " dotfiles_link
         dotfiles_link="${dotfiles_link:-${default_dotfiles_link}}"
         echo "Cloning from $dotfiles_link"
         git clone --depth 1 "$dotfiles_link" "$dotfiles_dir"
@@ -124,7 +124,7 @@ function install_ssh_keys {
         ssh-keygen -N "" -t ed25519 -a 32 -C "$USER" -f "$HOME"/.ssh/id_ed25519 1>/dev/null
 
         echo -e "\nGenerated public ssh key\n$(cat "$ssh_key_file".pub)\n"
-        read -pr "Press enter to continue"
+        read -r -p "Press enter to continue"
 
         echo "SSH keys installed"
     else
@@ -360,7 +360,7 @@ function install_initials {
         rm "./$DOWNLOADS/go$GO_VERSION.linux-amd64.tar.gz" 2>/dev/null || true
     fi
 
-    read -pr "Install fonts? ([Y]es/[N]o - default)" response
+    read -r -p "Install fonts? ([Y]es/[N]o - default)" response
     response=$(echo "$response" | tr '[:upper:]' '[:lower:]')
     if [[ "$response" == "yes" || "$response" == "y" ]]; then
         echo "Installing fonts"
@@ -437,11 +437,11 @@ function add_to_sudoers {
 function setup_vmware {
     if sudo dmesg | grep -iq hypervisor | grep -q vmware; then
         echo ""
-        read -pr "Looks like you are running in VMWare, setup tools for it? ([Y]es/[N]o) " response
+        read -r -p "Looks like you are running in VMWare, setup tools for it? ([Y]es/[N]o) " response
         response=$(echo "$response" | tr '[:upper:]' '[:lower:]')
         if [[ "$response" == "yes" || "$response" == "y" ]]; then
 
-            read -pr "Delete old tools? ([Y]es/[N]o - default) " response
+            read -r -p "Delete old tools? ([Y]es/[N]o - default) " response
             response=$(echo "$response" | tr '[:upper:]' '[:lower:]')
             if [[ "$response" == "yes" || "$response" == "y" ]]; then
                 sudo apt autoremove open-vm-tools open-vm-tools-desktop
