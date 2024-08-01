@@ -92,7 +92,7 @@ install_postgresql() {
 
 function install_dotfiles {
     dotfiles_dir="$HOME/.dotfiles"
-    default_dotfiles_link="git@github.com:Inviter111/dotfiles.git"
+    default_dotfiles_link="https://github.com/Inviter111/dotfiles.git"
 
     if [[ ! -d $dotfiles_dir ]]; then
         echo -e "Installing dotfiles..."
