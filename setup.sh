@@ -176,6 +176,7 @@ function install_alacritty {
             else
                 echo "No XDG_SESSION_TYPE was found, installing alacritty with default options"
                 cargo build --release 1>/dev/null
+                sleep 1s
             fi
         else
             echo "Alacritty already built"
@@ -299,6 +300,10 @@ function install_neovim {
 
 function install_initials {
     echo "Installing initial packages"
+
+    if [[ -f "$HOME/.zshrc" ]]; then
+        . "$HOME/.zshrc"
+    fi
 
     sudo apt install -yq build-essential aptitude-common curl tldr tree stow shellcheck
     if [[ "$XDG_SESSION_TYPE" == "wayland" ]]; then
