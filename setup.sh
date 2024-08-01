@@ -428,7 +428,7 @@ function add_to_sudoers {
     fi
     
     echo "Checking sudo..."
-    if [[ $(sudo -v) ]]; then
+    if ! sudo -l &>/dev/null ; then
         echo "Looks like you didnt logout and login, try again"
         exit 1
     fi
