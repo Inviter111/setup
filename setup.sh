@@ -11,8 +11,6 @@ if [ -n "$DEBUG" ]; then
     set -x
 fi
 
-
-
 trap 'echo "Error: $? at line $LINENO" >&2' ERR
 
 function cleanup() {
@@ -301,10 +299,6 @@ function install_neovim {
 function install_initials {
     echo "Installing initial packages"
 
-    if [[ -f "$HOME/.zshrc" ]]; then
-        . "$HOME/.zshrc"
-    fi
-
     sudo apt install -yq build-essential aptitude-common curl tldr tree stow shellcheck
     if [[ "$XDG_SESSION_TYPE" == "wayland" ]]; then
         sudo apt install -yq wl-clipboard
@@ -440,7 +434,7 @@ function add_to_sudoers {
 }
 
 function setup_vmware {
-    if sudo dmesg | grep -iq hypervisor | grep -q vmware; then
+    if sudo dmesg | grep -i hypervisor | grep -iq vmware; then
         echo ""
         read -r -p "Looks like you are running in VMWare, setup tools for it? ([Y]es/[N]o) " response
         response=$(echo "$response" | tr '[:upper:]' '[:lower:]')
