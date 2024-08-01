@@ -2,9 +2,7 @@
 
 set -eo pipefail
 
-TEMP_FILE=temp
 DOWNLOADS=downloads
-INSTALL_FOLDER=$(pwd)
 mkdir ./$DOWNLOADS 2>/dev/null || true
 
 GO_VERSION="1.22.5"
@@ -28,6 +26,9 @@ trap 'cleanup' EXIT
 function setup {
     echo ""
     add_to_sudoers
+
+    echo ""
+    setup_kde
 
     echo ""
     install_zsh
@@ -54,16 +55,16 @@ function setup {
     install_postgresql
 
     echo ""
-#     setup_kde
-#     setup_vmware
-#     populate_sources_list
+    setup_vmware
+
+    # populate_sources_list
 }
 
-function install_postgresql {
+install_postgresql() {
     if [[ -z $(psql -c "select version();" 2>/dev/null) ]]; then
         echo "Installing postgresql..."
 
-        if [[ -z $(grep ^ /etc/apt/sources.list /etc/apt/sources.list.d/* | grep postgres) ]]; then
+        if ! grep -q ^ /etc/apt/sources.list /etc/apt/sources.list.d/* | grep postgres; then
             sudo apt install -y postgresql-common
             sudo /usr/share/postgresql-common/pgdg/apt.postgresql.org.sh
         fi
@@ -71,10 +72,10 @@ function install_postgresql {
         sudo apt install -y postgresql
 
         echo "Postgresql installed, lets set up user with database"
-        read -p "Enter username (default is $USER): " pg_user
-        read -s -p "Enter password (if empty, same as username): " pg_password
+        read -pr "Enter username (default is $USER): " pg_user
+        read -spr "Enter password (if empty, same as username): " pg_password
         echo ""
-        read -p "Enter database name (if empty, same as username): " pg_db
+        read -pr "Enter database name (if empty, same as username): " pg_db
         pg_user=${pg_user:-$USER}
         pg_password=${pg_password:-$USER}
         pg_db=${pg_db:-$USER}
@@ -96,17 +97,17 @@ function install_dotfiles {
     if [[ ! -d $dotfiles_dir ]]; then
         echo -e "Installing dotfiles..."
         echo "Dotfiles dir was not found, should download"
-        read -p "Provide a link to github repo or use default ($default_dotfiles_link): " dotfiles_link
+        read -pr "Provide a link to github repo or use default ($default_dotfiles_link): " dotfiles_link
         dotfiles_link="${dotfiles_link:-${default_dotfiles_link}}"
         echo "Cloning from $dotfiles_link"
-        git clone --depth 1 $dotfiles_link $dotfiles_dir
+        git clone --depth 1 "$dotfiles_link" "$dotfiles_dir"
 
         if [[ ! $(which stow) ]]; then
-            echo "Stow was not installed, it can be installed with `install_initials` function"
+            echo "Stow was not installed, it can be installed with install_initials function"
             exit 1
         fi
 
-        stow --dir $dotfiles_dir --target $HOME .
+        stow --dir "$dotfiles_dir" --target "$HOME" .
 
         echo "Dotfiles linked"
     else
@@ -115,15 +116,15 @@ function install_dotfiles {
 }
 
 function install_ssh_keys {
-    if [[ ! $(find $HOME/.ssh/ -iname '*.pub') ]]; then
+    if [[ ! $(find "$HOME"/.ssh/ -iname '*.pub') ]]; then
         echo -e "Installing ssh keys..."
 
         ssh_key_file="$HOME/.ssh/id_ed25519"
         echo "SSH keys was not found, generating new ones"
-        ssh-keygen -N "" -t ed25519 -a 32 -C "$USER" -f $HOME/.ssh/id_ed25519 1>/dev/null
+        ssh-keygen -N "" -t ed25519 -a 32 -C "$USER" -f "$HOME"/.ssh/id_ed25519 1>/dev/null
 
-        echo -e "\nGenerated public ssh key\n$(cat $ssh_key_file.pub)\n"
-        read -p "Press enter to continue"
+        echo -e "\nGenerated public ssh key\n$(cat "$ssh_key_file".pub)\n"
+        read -pr "Press enter to continue"
 
         echo "SSH keys installed"
     else
@@ -164,7 +165,7 @@ function install_alacritty {
 
         if [[ ! -e "$alacritty_installed_bin" ]]; then
             echo "Builded binary not found, building now"
-            xdg_session=$(echo "$XDG_SESSION_TYPE")
+            xdg_session="$XDG_SESSION_TYPE"
             cd $alacritty_source_folder
             if [[ $xdg_session == "wayland" ]]; then
                 echo "Installing alacritty for Wayland"
@@ -191,10 +192,10 @@ function install_alacritty {
         desktop_entry_file=$(echo "$desktop_entry_filepath" | awk -F'/' '{print $NF}')
         if [[ ! -e $(find /usr/share/application -iname "$desktop_entry_file") ]]; then
             echo "Copying icon to $alacritty_icon_path"
-            sudo rsync -abuP --mkpath $(find $alacritty_source_folder -iname 'alacritty-term.png') $alacritty_icon_path
+            sudo rsync -abuP --mkpath "$(find $alacritty_source_folder -iname 'alacritty-term.png')" $alacritty_icon_path
 
             echo "Copying $desktop_entry_filepath -> /usr/share/applications/$desktop_entry_file"
-            sudo cat $desktop_entry_filepath | sed "s|Icon=.*|Icon=$alacritty_icon_path|g" > /usr/share/applications/$desktop_entry_file
+            sudo cat "$desktop_entry_filepath" | sed "s|Icon=.*|Icon=$alacritty_icon_path|g" > /usr/share/applications/"$desktop_entry_file"
 
             if [[ $(which kbuildsycoca5) ]]; then
                 # Update desktop entries
@@ -230,12 +231,12 @@ function install_zsh {
             echo "Zsh already installed, skipping"
         fi
 
-        if [[ -z $(cat /etc/shells | grep "zsh") ]]; then
+        if ! grep -aq "zsh" /etc/shells; then
             echo "Zsh not added in verified shells, check your /etc/shells file"
             exit 1
         else
             if [[ "$SHELL" != "$(which zsh)" ]]; then
-                sudo chsh -s $(which zsh)
+                sudo chsh -s "$(which zsh)"
                 echo "Zsh set as default editor, relogin and rerun script from zsh"
                 exit 1
             fi
@@ -299,12 +300,24 @@ function install_neovim {
 function install_initials {
     echo "Installing initial packages"
 
-    sudo apt install -yq build-essential aptitude-common curl tldr tree stow
+    sudo apt install -yq build-essential aptitude-common curl tldr tree stow shellcheck
+    if [[ "$XDG_SESSION_TYPE" == "wayland" ]]; then
+        sudo apt install -yq wl-clipboard
+    fi
 
     if [[ -z $(which cargo) ]]; then
         echo "Installing rustup"
         curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- --profile default
-        source "$HOME/.cargo/env"
+        if [[ -f "$HOME/.cargo/env" ]]; then
+            if [[ -f "$HOME/.zshrc" ]]; then
+                echo "source $HOME/.cargo/env" >> "$HOME/.zshrc"
+            elif [[ -f "$HOME/.bashrc" ]]; then
+                echo "source $HOME/.cargo/env" >> "$HOME/.bashrc"
+            fi
+            PATH=$PATH:$HOME/.cargo/bin
+        else
+            echo "Warning: File $HOME/.cargo/env was not found, rust installation maybe corrupted, check please"
+        fi
         echo "Rustup installed"
     fi
 
@@ -312,7 +325,10 @@ function install_initials {
         echo "Installing nvm"
 
         curl -o- https://raw.githubusercontent.com/nvm-sh/nvm/v0.40.0/install.sh | bash
-        export NVM_DIR="$([ -z "${XDG_CONFIG_HOME-}" ] && printf %s "${HOME}/.nvm" || printf %s "${XDG_CONFIG_HOME}/nvm")"
+        NVM_DIR="$([ -z "${XDG_CONFIG_HOME-}" ]
+        export NVN_DIR
+        printf %s "${HOME}/.nvm" || printf %s "${XDG_CONFIG_HOME}/nvm")"
+        # shellcheck disable=SC1091
         [ -s "$NVM_DIR/nvm.sh" ] && \. "$NVM_DIR/nvm.sh" # This loads nvm
 
         nvm install --lts
@@ -333,9 +349,10 @@ function install_initials {
         fi
 
         sudo tar -C /usr/local -xzf $DOWNLOADS/go$GO_VERSION.linux-amd64.tar.gz
-        echo 'PATH="$PATH:/usr/local/go/bin"' >> $HOME/.profile
-        echo 'PATH="$PATH:/usr/local/go/bin"' >> $HOME/.zshrc
-        source ~/.profile
+
+        # shellcheck disable=SC2016
+        echo 'PATH=$PATH:/usr/local/go/bin' >> "$HOME"/.zshrc
+        PATH=$PATH:/usr/local/go/bin
 
         echo "Installed go version"
         go version
@@ -343,31 +360,31 @@ function install_initials {
         rm "./$DOWNLOADS/go$GO_VERSION.linux-amd64.tar.gz" 2>/dev/null || true
     fi
 
-    read -p "Install fonts? ([Y]es/[N]o - default)" response
+    read -pr "Install fonts? ([Y]es/[N]o - default)" response
     response=$(echo "$response" | tr '[:upper:]' '[:lower:]')
     if [[ "$response" == "yes" || "$response" == "y" ]]; then
         echo "Installing fonts"
 
         fonts_dir="$HOME/.local/share/fonts"
-        mkdir -p $fonts_dir
+        mkdir -p "$fonts_dir"
         declare -a font_families=(
             "JetBrainsMono"
         )
         for font_family in "${font_families[@]}"; do
             if [[ ! -e "$fonts_dir/$font_family" ]]; then
-                mkdir $fonts_dir/$font_family
+                mkdir "$fonts_dir"/"$font_family"
             fi
 
             if [[ ! -e "$DOWNLOADS/fonts/$font_family/$font_family.tar.xz" ]]; then
                 echo "Downloading font $font_family"
-                mkdir -p $DOWNLOADS/fonts/$font_family
-                curl -fLO --output-dir "$DOWNLOADS/fonts/$font_family" https://github.com/ryanoasis/nerd-fonts/releases/download/v3.2.1/$font_family.tar.xz
+                mkdir -p $DOWNLOADS/fonts/"$font_family"
+                curl -fLO --output-dir "$DOWNLOADS/fonts/$font_family" https://github.com/ryanoasis/nerd-fonts/releases/download/v3.2.1/"$font_family".tar.xz
             fi
 
             if [[ -z $(ls -A "$fonts_dir/$font_family") ]]; then
                 echo "Extracting font $font_family to $fonts_dir/$font_family"
-                tar xf ./$DOWNLOADS/fonts/$font_family/$font_family.tar.xz --directory $fonts_dir/$font_family
-                fc-cache $fonts_dir
+                tar xf ./$DOWNLOADS/fonts/"$font_family"/"$font_family".tar.xz --directory "$fonts_dir"/"$font_family"
+                fc-cache "$fonts_dir"
             fi
         done
 
@@ -389,7 +406,7 @@ function setup_kde {
     if [[ $(which lookandfeeltool) ]]; then
         echo "KDE found"
 
-        if [[ $(lookandfeeltool --list | grep $KDE_THEME) ]]; then
+        if ! lookandfeeltool --list | grep -q $KDE_THEME; then
             echo "Setting dark theme"
             lookandfeeltool -a $KDE_THEME
         fi
@@ -399,11 +416,11 @@ function setup_kde {
 }
 
 function add_to_sudoers {
-    if [[ ! $(groups $USER | grep sudo) ]]; then
+    if ! groups "$USER" | grep -q sudo; then
         echo "Adding to sudoers"
 
         su root -c "sudo usermod -aG sudo $USER"
-        su $USER
+        su - "$USER"
 
         echo "User $USER added to sudoers"
     else
@@ -412,16 +429,16 @@ function add_to_sudoers {
 }
 
 function setup_vmware {
-    if [[ $(sudo dmesg | grep -i hypervisor | grep vmware) ]]; then
+    if sudo dmesg | grep -iq hypervisor | grep -q vmware; then
         echo ""
-        read -p "Looks like you are running in VMWare, setup tools for it? ([Y]es/[N]o) " response
+        read -pr "Looks like you are running in VMWare, setup tools for it? ([Y]es/[N]o) " response
         response=$(echo "$response" | tr '[:upper:]' '[:lower:]')
         if [[ "$response" == "yes" || "$response" == "y" ]]; then
 
-            read -p "Delete old tools? ([Y]es/[N]o - default) " response
+            read -pr "Delete old tools? ([Y]es/[N]o - default) " response
             response=$(echo "$response" | tr '[:upper:]' '[:lower:]')
-            if [[ "$response" == "yes" || "$response" == y ]]; then
-#                 sudo apt autoremove open-vm-tools open-vm-tools-desktop
+            if [[ "$response" == "yes" || "$response" == "y" ]]; then
+                sudo apt autoremove open-vm-tools open-vm-tools-desktop
 
                 echo "Uninstalled old packages. Reboot your VM now and go VM > Install VMWare Tools"
                 echo "PS: Sometimes vmware-tools.service could crash, investigate later"
@@ -430,12 +447,12 @@ function setup_vmware {
 
             tools_archive=$(sudo find /media/ -iname 'vmwaretools*.tar.gz')
 
-            if [ "true" ]; then
+            if true; then
                 tools_archive=$(sudo find /media/ -iname 'vmwaretools*.tar.gz')
 
                 if [[ "$tools_archive" ]]; then
                     if ! test -f ./$DOWNLOADS/vmware-tools.tar.gz; then
-                        cp $tools_archive ./$DOWNLOADS/vmware-tools.tar.gz
+                        cp "$tools_archive" ./$DOWNLOADS/vmware-tools.tar.gz
                     else
                         echo "Archive ./$DOWNLOADS/vmware-tools.tar.gz already exists, skipping"
                     fi
@@ -448,13 +465,13 @@ function setup_vmware {
                     fi
 
                     installer=$(find ./$DOWNLOADS/vmware-tools -name 'vmware-install.pl')
-                    sudo chmod +x $installer
+                    sudo chmod +x "$installer"
                     sudo bash -c "sudo $installer"
                     sudo apt install -yq open-vm-tools-desktop
 
-                    mount_point="/media/$(echo $tools_archive | awk -F' |/' '{print $3}')"
-                    if test -d $tools_archive; then
-                        sudo umount $mount_point
+                    mount_point="/media/$(echo "$tools_archive" | awk -F' |/' '{print $3}')"
+                    if test -d "$tools_archive"; then
+                        sudo umount "$mount_point"
                         echo "$mount_point unmounted"
                     fi
                 else
