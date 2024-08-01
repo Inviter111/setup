@@ -420,11 +420,17 @@ function add_to_sudoers {
         echo "Adding to sudoers"
 
         su root -c "sudo usermod -aG sudo $USER"
-        su - "$USER"
-
         echo "User $USER added to sudoers"
+        echo "Logout and login to apply effects and then run script again"
+        exit 1
     else
         echo "$USER already in sudoers, skipping"
+    fi
+    
+    echo "Checking sudo..."
+    if [[ $(sudo -v) ]]; then
+        echo "Looks like you didnt logout and login, try again"
+        exit 1
     fi
 }
 
