@@ -236,7 +236,7 @@ function install_zsh {
             exit 1
         else
             if [[ "$SHELL" != "$(which zsh)" ]]; then
-                sudo chsh -s "$(which zsh)"
+                sudo usermod -s "$(which zsh)" "$USER"
                 echo "Zsh set as default editor, relogin and rerun script from zsh"
                 exit 1
             fi
